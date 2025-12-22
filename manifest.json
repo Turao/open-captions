@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Open Captions",
+  "version": "1.0",
+  "description": "Adds custom subtitle overlay to streaming content",
+  "permissions": ["activeTab", "storage", "scripting"],
+  "host_permissions": [
+    "https://*.netflix.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.netflix.com/*"
+      ],
+      "css": ["styles.css"],
+      "js": [
+        "src/StreamingPlatform.js",
+        "src/PlatformDetector.js",
+        "src/SubtitleOverlay.js",
+        "src/strategies/NetflixStrategy.js",
+        "content.js"
+      ]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  }
+}

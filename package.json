@@ -1,0 +1,12 @@
+{
+  "name": "open-captions",
+  "version": "1.0.0",
+  "description": "Open Captions extension",
+  "main": "content.js",
+  "scripts": {
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.9",
+    "@babel/preset-env": "^7.23.9"
+  }
+}
