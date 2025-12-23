@@ -1,8 +1,12 @@
-// Initialize the subtitle overlay for browser environment
-// SubtitleOverlay is loaded globally via manifest.json
-// Use setTimeout to ensure all strategy files have loaded and registered
-let subtitleOverlay = null;
+// Import strategies to ensure they register themselves
+import './strategies/NetflixStrategy';
 
+import { SubtitleOverlay } from './SubtitleOverlay';
+
+// Initialize the subtitle overlay for browser environment
+let subtitleOverlay: SubtitleOverlay | null = null;
+
+// Use setTimeout to ensure all strategy files have loaded and registered
 setTimeout(() => {
   subtitleOverlay = new SubtitleOverlay();
 
@@ -40,9 +44,9 @@ on our planet.`;
 
 // Listen for messages from the popup
 // This listener is set up outside the setTimeout to ensure it's always available
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   // Handle loadSubtitles action
-  if (request.action === "loadSubtitles") {
+  if (request.action === 'loadSubtitles') {
     if (subtitleOverlay) {
       subtitleOverlay.loadSubtitles(request.subtitles);
       sendResponse({ success: true });
@@ -57,9 +61,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     return false; // Response sent synchronously
   }
-  
-  // Other actions (getOffset, increaseOffset, decreaseOffset, resetOffset) 
+
+  // Other actions (getOffset, increaseOffset, decreaseOffset, resetOffset)
   // are handled by SubtitleOverlay's own message listener
   // Return false to allow other listeners to handle them
   return false;
 });
+

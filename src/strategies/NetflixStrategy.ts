@@ -1,17 +1,59 @@
-class NetflixPlatform extends StreamingPlatform {
-  detect() {
-    return window.location.hostname.includes("netflix.com");
+import { StreamingPlatform } from '../StreamingPlatform';
+import { PlatformDetector } from '../PlatformDetector';
+
+// Extend Window interface to include Netflix-specific properties
+declare global {
+  interface Window {
+    netflix?: {
+      appContext?: {
+        state?: {
+          playerApp?: {
+            getAPI?: () => NetflixPlayerAPI | undefined;
+            getState?: () => NetflixPlayerState | undefined;
+          };
+        };
+      };
+    };
+  }
+}
+
+interface NetflixPlayerAPI {
+  videoPlayer?: {
+    getAllPlayerSessionIds?: () => string[] | undefined;
+    getVideoPlayerBySessionId?: (sessionId: string) => NetflixPlayer | undefined;
+  };
+}
+
+interface NetflixPlayer {
+  getCurrentTime?: () => number | undefined;
+  getSeekableRange?: () => { start: number; end: number } | undefined;
+  getVideoElement?: () => HTMLVideoElement | undefined;
+}
+
+interface NetflixPlayerState {
+  videoPlayer?: {
+    [sessionId: string]: {
+      state?: {
+        currentTime?: number;
+      };
+    };
+  };
+}
+
+export class NetflixPlatform extends StreamingPlatform {
+  detect(): boolean {
+    return window.location.hostname.includes('netflix.com');
   }
 
-  findVideoInShadowDOM(root) {
+  private findVideoInShadowDOM(root: Document | ShadowRoot): HTMLVideoElement | null {
     // Search for video elements in shadow DOM
-    let video = root.querySelector("video");
+    let video = root.querySelector('video');
     if (video) return video;
 
     // Recursively search shadow roots
-    const shadowRoots = Array.from(root.querySelectorAll("*"))
+    const shadowRoots = Array.from(root.querySelectorAll('*'))
       .map((el) => el.shadowRoot)
-      .filter(Boolean);
+      .filter((sr): sr is ShadowRoot => sr !== null);
 
     for (const shadowRoot of shadowRoots) {
       video = this.findVideoInShadowDOM(shadowRoot);
@@ -21,14 +63,14 @@ class NetflixPlatform extends StreamingPlatform {
     return null;
   }
 
-  findVideoPlayer() {
+  findVideoPlayer(): HTMLVideoElement | null {
     // Try to find video element using multiple strategies
-    let videoElement = null;
-    let bestCandidate = null;
+    let videoElement: HTMLVideoElement | null = null;
+    let bestCandidate: HTMLVideoElement | null = null;
     let bestScore = -1;
 
     // Score function to prioritize better video elements
-    const scoreVideo = (video) => {
+    const scoreVideo = (video: HTMLVideoElement): number => {
       let score = 0;
       if (video.readyState >= 2) score += 10; // Has loaded metadata
       if (video.duration > 0) score += 5; // Has duration
@@ -40,16 +82,16 @@ class NetflixPlatform extends StreamingPlatform {
 
     // Strategy 1: Try standard selectors
     const selectors = [
-      "video",
-      ".VideoContainer video",
-      ".player-video-wrapper video",
-      ".watch-video video",
-      "[data-uia='video-player'] video",
-      "video[data-uia='video-player']",
+      'video',
+      '.VideoContainer video',
+      '.player-video-wrapper video',
+      '.watch-video video',
+      '[data-uia="video-player"] video',
+      'video[data-uia="video-player"]',
     ];
 
     for (const selector of selectors) {
-      const elements = document.querySelectorAll(selector);
+      const elements = document.querySelectorAll<HTMLVideoElement>(selector);
       for (const el of elements) {
         const score = scoreVideo(el);
         if (score > bestScore) {
@@ -86,13 +128,13 @@ class NetflixPlatform extends StreamingPlatform {
           }
         }
       } catch (e) {
-        console.log("Netflix API access failed:", e);
+        console.log('Netflix API access failed:', e);
       }
     }
 
     // Strategy 4: Find video by checking all video elements and their properties
     if (!videoElement) {
-      const allVideos = document.querySelectorAll("video");
+      const allVideos = document.querySelectorAll<HTMLVideoElement>('video');
       for (const video of allVideos) {
         const score = scoreVideo(video);
         if (score > bestScore) {
@@ -107,13 +149,12 @@ class NetflixPlatform extends StreamingPlatform {
 
     // Only update if we found a different video element or don't have one yet
     // Also re-check if current video element seems invalid
-    const shouldUpdate = 
+    const shouldUpdate =
       (videoElement && videoElement !== this.videoPlayer) ||
-      (this.videoPlayer && (
-        isNaN(this.videoPlayer.currentTime) ||
-        this.videoPlayer.readyState === 0 ||
-        (this.videoPlayer.offsetWidth === 0 && this.videoPlayer.offsetHeight === 0)
-      ));
+      (this.videoPlayer &&
+        (isNaN(this.videoPlayer.currentTime) ||
+          this.videoPlayer.readyState === 0 ||
+          (this.videoPlayer.offsetWidth === 0 && this.videoPlayer.offsetHeight === 0)));
 
     if (shouldUpdate && videoElement) {
       // Clean up old listeners
@@ -124,7 +165,7 @@ class NetflixPlatform extends StreamingPlatform {
       this.videoPlayer = videoElement;
 
       // Log for debugging
-      console.log("Netflix video player found:", this.videoPlayer, {
+      console.log('Netflix video player found:', this.videoPlayer, {
         currentTime: this.videoPlayer.currentTime,
         duration: this.videoPlayer.duration,
         paused: this.videoPlayer.paused,
@@ -138,9 +179,9 @@ class NetflixPlatform extends StreamingPlatform {
     return this.videoPlayer;
   }
 
-  getCurrentTime() {
+  getCurrentTime(): number | null {
     // Try multiple methods to get the current playback time
-    
+
     // Method 1: Direct video element access
     if (this.videoPlayer) {
       const videoTime = this.videoPlayer.currentTime;
@@ -159,7 +200,7 @@ class NetflixPlatform extends StreamingPlatform {
           const playerApp = appContext.state?.playerApp;
           if (playerApp) {
             const playerAPI = playerApp.getAPI?.();
-            if (playerAPI && playerAPI.videoPlayer) {
+            if (playerAPI?.videoPlayer) {
               const sessionIds = playerAPI.videoPlayer.getAllPlayerSessionIds?.();
               if (sessionIds && sessionIds.length > 0) {
                 const player = playerAPI.videoPlayer.getVideoPlayerBySessionId?.(sessionIds[0]);
@@ -175,23 +216,23 @@ class NetflixPlatform extends StreamingPlatform {
 
           // Path 2: Try accessing through player state
           const playerState = appContext.state?.playerApp?.getState?.();
-          if (playerState && playerState.videoPlayer) {
+          if (playerState?.videoPlayer) {
             const sessionIds = Object.keys(playerState.videoPlayer);
             if (sessionIds.length > 0) {
               const session = playerState.videoPlayer[sessionIds[0]];
-              if (session && session.state && session.state.currentTime !== undefined) {
+              if (session?.state?.currentTime !== undefined) {
                 return session.state.currentTime / 1000;
               }
             }
           }
         }
       }
-    } catch (e) {
+    } catch {
       // Silently fail - we'll try other methods
     }
 
     // Method 3: Try to find and read from any visible playing video
-    const allVideos = document.querySelectorAll("video");
+    const allVideos = document.querySelectorAll<HTMLVideoElement>('video');
     for (const video of allVideos) {
       if (!video.paused && video.readyState >= 2) {
         const time = video.currentTime;
@@ -204,7 +245,7 @@ class NetflixPlatform extends StreamingPlatform {
     return null;
   }
 
-  getDuration() {
+  getDuration(): number | null {
     // Try to get duration from video element first
     if (this.videoPlayer && !isNaN(this.videoPlayer.duration)) {
       return this.videoPlayer.duration;
@@ -220,21 +261,21 @@ class NetflixPlatform extends StreamingPlatform {
             const player = playerAPI.videoPlayer?.getVideoPlayerBySessionId?.(session);
             if (player) {
               const seekableRange = player.getSeekableRange?.();
-              if (seekableRange && seekableRange.end !== undefined) {
+              if (seekableRange?.end !== undefined) {
                 return seekableRange.end / 1000;
               }
             }
           }
         }
       }
-    } catch (e) {
+    } catch {
       // Ignore errors
     }
 
     return null;
   }
 
-  observeVideoPlayer(onVideoFound) {
+  observeVideoPlayer(onVideoFound: () => void): void {
     // Add a delay before watching for video player to avoid triggering Netflix's security
     setTimeout(() => {
       super.observeVideoPlayer(() => {
@@ -248,6 +289,5 @@ class NetflixPlatform extends StreamingPlatform {
 }
 
 // Auto-register with PlatformDetector when loaded
-if (typeof PlatformDetector !== "undefined") {
-  PlatformDetector.register(NetflixPlatform);
-}
+PlatformDetector.register(NetflixPlatform);
+

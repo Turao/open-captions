@@ -13,13 +13,7 @@
         "https://*.netflix.com/*"
       ],
       "css": ["styles.css"],
-      "js": [
-        "src/StreamingPlatform.js",
-        "src/PlatformDetector.js",
-        "src/SubtitleOverlay.js",
-        "src/strategies/NetflixStrategy.js",
-        "content.js"
-      ]
+      "js": ["content.js"]
     }
   ],
   "action": {
