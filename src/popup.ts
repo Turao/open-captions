@@ -3,6 +3,8 @@
  * Handles file upload, offset controls, and connection status
  */
 
+import { OpenSubtitlesComponent } from "./open-subtitles/Component";
+
 // DOM Elements
 let connectionStatus: HTMLDivElement;
 let dropzone: HTMLDivElement;
@@ -56,6 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
   getCurrentOffset();
   loadSavedSubtitle();
   loadSavedAppearance();
+
+  new OpenSubtitlesComponent();
 });
 
 /**
