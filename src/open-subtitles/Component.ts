@@ -2,58 +2,99 @@ import { Client, Subtitle, groupBy, highestDownloadCountFirst } from "./client";
 
 declare global {
     interface WindowEventMap {
-        'user.logged-in': CustomEvent<void>,
+        'subtitles.updated': CustomEvent<Subtitles>,
+        'content.updated': CustomEvent<string>,
         'language.updated': CustomEvent<string>,
-        'available.subtitles.updated': CustomEvent<Subtitles>,
-        'displayable.subtitles.updated': CustomEvent<Subtitles>,
         'subtitle.selected': CustomEvent<Subtitle>,
+        'user.authenticated': CustomEvent<void>,
     }
 }
+
+const client = new Client();
 
 type Subtitles = Record<string, Subtitle[]>;
 
-export class OpenSubtitlesComponent {
-    private client: Client;
-    private loginComponent: LoginComponent;
-    private subtitlesLoader: SubtitlesLoader;
-    private languageSelector: LanguageSelector;
-    private subtitleSelector: SubtitleSelector;
-
+export class OpenSubtitlesComponent extends HTMLElement {
     constructor() {
-        this.client = new Client();
-        this.loginComponent = new LoginComponent(this.client);
-        this.subtitlesLoader = new SubtitlesLoader(this.client);
-        this.languageSelector = new LanguageSelector();
-        this.subtitleSelector = new SubtitleSelector();
+        super();
+        const shadowRoot = this.attachShadow({mode: "open"});
+        shadowRoot.innerHTML = `
+            <section class="section open-subtitles">
+                <open-subtitles-content-details></open-subtitles-content-details>
+                <open-subtitles-login-component></open-subtitles-login-component>
+                <open-subtitles-language-selector></open-subtitles-language-selector>
+                <open-subtitles-subtitle-selector></open-subtitles-subtitle-selector>
+            </section>
+        `;
+        window.addEventListener('user.authenticated', this.onUserAuthenticatedEvent.bind(this));
     }
-}
+    
+    connectedCallback() {
+        console.log('connected!')
+    };
 
-
-// SubtitlesLoader is responsible for fetching the list of available subtitles from OpenSubtitles
-class SubtitlesLoader {
-    private client: Client;
-
-    constructor(client: Client) {
-        this.client = client;
-        window.addEventListener('user.logged-in', this.onUserLoggedInEvent.bind(this));
-    }
-
-    private async onUserLoggedInEvent(event: CustomEvent<void>) {
-        console.log('[subtitles-loader] user logged in. loading subtitles...')
-        const response = await this.client.listSubtitles({ query: 'Pirates of the Caribean' })
+    private async onUserAuthenticatedEvent(event: CustomEvent<void>) {
+        const response = await client.listSubtitles({ query: 'Pirates of the Caribean' })
         const grouped = groupBy(response.data, subtitle => subtitle.attributes.language);
         Object.keys(grouped).forEach(language => grouped[language].sort(highestDownloadCountFirst));
-        window.dispatchEvent(new CustomEvent('available.subtitles.updated', { detail: grouped }));
+        window.dispatchEvent(new CustomEvent('subtitles.updated', { detail: grouped }));
     }
 }
 
-class LoginComponent {
-    private client: Client;
+class ContentDetails extends HTMLElement {
+    content: string = 'Pirates of the Caribean';
+    element: HTMLDivElement;
+
+    constructor() {
+        super();
+        const shadowRoot = this.attachShadow({ mode: "open" });
+        shadowRoot.innerHTML = `
+            <section class="section open-subtitles-current-video-details">
+                <div id="content-details">
+                </div>
+            </section>
+        `;
+
+        this.element = shadowRoot.getElementById('content-details') as HTMLDivElement;
+        window.addEventListener('content.updated', this.onContentUpdated.bind(this));
+
+        setTimeout(() => { window.dispatchEvent(new CustomEvent('content.updated', { detail: 'Pirates of the Caribean' })) }, 2000)
+    }
+
+    private onContentUpdated(event: CustomEvent<string>) {
+        this.content = event.detail?.valueOf() as string;
+        this.element.innerHTML = `
+            <label>You are watching:</label>
+            ${this.content}
+        `;
+    }
+}
+
+class LoginComponent extends HTMLElement {
     private formElement: HTMLFormElement;
 
-    constructor(client: Client) {
-        this.client = client;
-        this.formElement = document.getElementById('open-subtitles-login-form') as HTMLFormElement;
+    constructor() {
+        super();
+        const shadowRoot = this.attachShadow({mode: "open"});
+        shadowRoot.innerHTML = `
+            <form id="login-form">
+                <div class="input-fields-container">
+                    <div>
+                        <label for="username">Username</label>
+                        <input id="username" type="text" name="username" required>
+                    </div>
+                    <div>
+                        <label for="password">Password</label>
+                        <input id="password" type="password" name="password" required>
+                    </div>
+                    <button type="submit">
+                    <span>Login</span>
+                    </button>
+                </div>
+            </form>
+        `;
+
+        this.formElement = shadowRoot.getElementById('login-form') as HTMLFormElement;
         this.formElement.addEventListener('submit', this.onSubmit.bind(this));
     }
 
@@ -63,21 +104,31 @@ class LoginComponent {
         const username = formData.get('username')?.valueOf() as string;
         const password = formData.get('password')?.valueOf() as string;
         // todo: improve error handling
-        await this.client.login(username, password);
-        window.dispatchEvent(new CustomEvent('user.logged-in'))
+        await client.login(username, password);
+        window.dispatchEvent(new CustomEvent('user.authenticated'))
     }
 }
 
-class LanguageSelector {
+class LanguageSelector extends HTMLElement {
     private formElement: HTMLFormElement;
-    private dataListElement: HTMLDataListElement;
+    private selectElement: HTMLSelectElement;
 
-    constructor() {
-        this.formElement = document.getElementById('language-form') as HTMLFormElement;
-        this.dataListElement = document.getElementById('language-datalist') as HTMLDataListElement;
+    constructor(parent: ShadowRoot) {
+        super();
+        const shadowRoot = this.attachShadow({ mode:"open" })
+        shadowRoot.innerHTML = `
+            <form id="language-form">
+                <label for="language-select">Select the language</label>
+                <select id="language-select" name="language">
+                </select>
+            </form>
+        `;
+
+        this.formElement = shadowRoot.getElementById('language-form') as HTMLFormElement;
+        this.selectElement = shadowRoot.getElementById('language-select') as HTMLSelectElement;
 
         this.formElement.addEventListener('change', this.onLanguageChangeEvent.bind(this));
-        window.addEventListener('available.subtitles.updated', this.onAvailableSubtitlesUpdatedEvent.bind(this));
+        window.addEventListener('subtitles.updated', this.onSubtitlesUpdatedEvent.bind(this));
     }
 
     private onLanguageChangeEvent(event: Event) {
@@ -88,31 +139,41 @@ class LanguageSelector {
         window.dispatchEvent(new CustomEvent('language.updated', { detail: language }));
     }
 
-    private onAvailableSubtitlesUpdatedEvent(event: CustomEvent<Subtitles>) {
+    private onSubtitlesUpdatedEvent(event: CustomEvent<Subtitles>) {
         const languages = Object.keys(event.detail).sort();
         console.log('[language-selector] subtitles updated. updating languages', languages);
         this.updateDataListElementOptions(languages);
     }
 
     private updateDataListElementOptions(languages: string[]) {
-        this.dataListElement.innerHTML = '';
+        this.selectElement.innerHTML = '';
         languages.forEach(language => {
             const option = document.createElement('option');
             option.value = language;
             option.label = language;
-            this.dataListElement.appendChild(option);
+            this.selectElement.appendChild(option);
         })
     }
 }
 
-class SubtitleSelector {
+class SubtitleSelector extends HTMLElement {
     private availableSubtitles: Subtitles = {};
     private language?: string;
-    private formElement: HTMLFormElement;
+    private selectElement: HTMLSelectElement;
 
     constructor() {
-        this.formElement = document.getElementById('subtitle-list') as HTMLFormElement;
-        window.addEventListener('available.subtitles.updated', this.onAvailableSubtitlesUpdatedEvent.bind(this));
+        super();
+        const shadowRoot = this.attachShadow({mode: "open"});
+        shadowRoot.innerHTML = `
+            <form id="subtitle-form">
+            <label for="subtitle-select">Select the subtitle</label>
+                <select id="subtitle-select" name="subtitle">
+                </select>
+            </form>
+        `;
+
+        this.selectElement = shadowRoot.getElementById('subtitle-select') as HTMLSelectElement;
+        window.addEventListener('subtitles.updated', this.onSubtitlesUpdatedEvent.bind(this));
         window.addEventListener('language.updated', this.onLanguageUpdatedEvent.bind(this));
         window.addEventListener('subtitle.selected', this.onSubtitleSelectedEvent.bind(this));
     }
@@ -123,7 +184,7 @@ class SubtitleSelector {
             Object.values(this.availableSubtitles).flatMap(s => s);
     }
 
-    private onAvailableSubtitlesUpdatedEvent(event: CustomEvent<Subtitles>) {
+    private onSubtitlesUpdatedEvent(event: CustomEvent<Subtitles>) {
         this.availableSubtitles = event.detail;
         console.log('[subtitle-selector] subtitles updated', this.availableSubtitles);
         this.updateSubtitlesDatalist(this.displayableSubtitles);
@@ -136,20 +197,26 @@ class SubtitleSelector {
     }
 
     private updateSubtitlesDatalist(subtitles: Subtitle[]) {
-        this.formElement.innerHTML = '';
+        this.selectElement.innerHTML = '';
 
         subtitles.forEach(subtitle => {
-            const button = document.createElement('button');
-            button.value = subtitle.attributes.url;
-            button.innerText = `${subtitle.attributes.download_count}`;
-            button.type = 'button';
-            button.className = 'offset-btn offset-btn--wide-large offset-btn--advance'
-            button.onclick = () => window.dispatchEvent(new CustomEvent('subtitle.selected', { detail: subtitle }));
-            this.formElement.appendChild(button);
+            const option = document.createElement('option');
+            option.value = subtitle.attributes.url;
+            option.innerText = `${subtitle.attributes.download_count}`;
+            option.onchange = () => window.dispatchEvent(new CustomEvent('subtitle.selected', { detail: subtitle }));
+            this.selectElement.appendChild(option);
         })
     }
 
     private onSubtitleSelectedEvent(event: CustomEvent<Subtitle>) {
         console.log('[subtitle-selector] subtitle selected', event.detail);
     }
+}
+
+export function init() {
+    customElements.define('open-subtitles', OpenSubtitlesComponent);
+    customElements.define('open-subtitles-login-component', LoginComponent);
+    customElements.define('open-subtitles-content-details', ContentDetails);
+    customElements.define('open-subtitles-language-selector', LanguageSelector);
+    customElements.define('open-subtitles-subtitle-selector', SubtitleSelector);
 }

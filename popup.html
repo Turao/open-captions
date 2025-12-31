@@ -32,80 +32,8 @@
 
       <!-- Main Content -->
       <main class="main">
-        <!-- Open Subtitles Login Section -->
-        <section class="section open-subtitles-login-section">
-          <div class="section-header">
-            <h2 class="section-title">Log in to Open Subtitles</h2>
-          </div>
 
-          <form id="open-subtitles-login-form">
-            <div class="input-fields-container">
-              <div class="login-input">
-                <label class="appearance-label" for="username">Username</label>
-                <input class="input-field" type="text" id="username" name="username" required>
-              </div>
-              <div class="login-input">
-                <label class="appearance-label" for="password">Password</label>
-                <input class="input-field" type="password" id="password" name="password" required>
-              </div>
-
-            <button class="offset-btn offset-btn--medium offset-btn--advance login-button" type="submit">
-              <span class="offset-btn-value">Login</span>
-            </button>
-          </div>
-        </form>
-        </section>
-
-        <section class="section open-subtitles-current-video-details">
-          <div class="section-header">
-            <h2 class="section-title">Details</h2>
-          </div>
-
-          <div>
-            <label class="appearance-label">You are watching:</label>
-            Space Jam
-          </div>
-        </section>
-
-        <section class="section open-subtitles-subtitle-picker">
-          <div class="section-header">
-            <h2 class="section-title">Subtitle</h2>
-          </div>
-
-          <form id="language-form">
-            <label class="appearance-label" for="language">Select the language</label>
-            <select class="input-field" list="language-datalist" id="language" name="language" placeholder="Language">
-            <datalist id="language-datalist">
-              <option selected value="de">German</option>
-              <option value="en">English</option>
-              <option value="es">Spanish</option>
-              <option value="fr">French</option>
-              <option value="hi">Hindi</option>
-              <option value="pt">Portuguese</option>
-            </datalist>
-            </select>
-          </form>
-
-          <label class="appearance-label" for="subtitle-list">Select the subtitle</label>
-          <div>
-            <li id="subtitle-list" class="subtitle-list">
-              <button class="offset-btn offset-btn--wide-large offset-btn--advance" type="button">1</button>
-              <button class="offset-btn offset-btn--wide-large offset-btn--advance" type="button">2</button>
-              <button class="offset-btn offset-btn--wide-large offset-btn--advance" type="button">3</button>
-              <button class="offset-btn offset-btn--wide-large offset-btn--advance" type="button">4</button>
-              <button class="offset-btn offset-btn--wide-large offset-btn--advance" type="button">5</button>
-              <button class="offset-btn offset-btn--wide-large offset-btn--advance" type="button">6</button>
-              <button class="offset-btn offset-btn--wide-large offset-btn--advance" type="button">7</button>
-              <button class="offset-btn offset-btn--wide-large offset-btn--advance" type="button">8</button>
-            </li>
-          </div>
-
-          <div>
-            <label class="appearance-label" >Selected Subtitle</label>
-            1
-          </div>
-        </section>
-
+        <open-subtitles>OpenSubtitles</open-subtitles>
 
         <!-- Subtitle Upload Section -->
         <section class="section upload-section">

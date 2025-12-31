@@ -1,7 +1,7 @@
 const APPLICATION_JSON = 'application/json'
 const USER_AGENT = 'OpenCaptions v0.1'
 const BASE_URL = 'https://api.opensubtitles.com/api/v1'
-const API_KEY = '' // we should be fetching the api key from a server
+const API_KEY = 'JXyv9apSImdsX8m1KvcPidXxTyGTVExN' // we should be fetching the api key from a server
 
 type ListSubtitlesRequest = {
     query: string;

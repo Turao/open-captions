@@ -3,7 +3,9 @@
  * Handles file upload, offset controls, and connection status
  */
 
-import { OpenSubtitlesComponent } from "./open-subtitles/Component";
+import { init as initOpenSubtitles } from "./open-subtitles/Component";
+
+initOpenSubtitles();
 
 // DOM Elements
 let connectionStatus: HTMLDivElement;
@@ -58,8 +60,6 @@ document.addEventListener('DOMContentLoaded', () => {
   getCurrentOffset();
   loadSavedSubtitle();
   loadSavedAppearance();
-
-  new OpenSubtitlesComponent();
 });
 
 /**
