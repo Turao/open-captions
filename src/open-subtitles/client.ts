@@ -29,6 +29,24 @@ export type Subtitle = {
 export class Client {
     private token?: string;
 
+    constructor() {
+        this.loadTokenFromStorage();
+    }
+
+    private async loadTokenFromStorage() {
+        const data = await chrome.storage.session.get('open-subtitles-token');
+        const token = data['open-subtitles-token'] as string | undefined;
+        if (token) {
+            this.token = token;
+            window.dispatchEvent(new CustomEvent('user.authenticated'));
+        }
+    }
+
+    private async setToken(token: string) {
+        this.token = token;
+        await chrome.storage.session.set({ 'open-subtitles-token': token });
+    }
+
     async login(username: string, password: string): Promise<void> {
         console.log('logging into open subtitles')
         const response = await fetch(`${BASE_URL}/login`, {
@@ -51,10 +69,15 @@ export class Client {
         }
 
         const result = await response.json();
-        this.token = result.token;
+        this.setToken(result.token);
+        window.dispatchEvent(new CustomEvent('user.authenticated'));
     }
 
     async listSubtitles(request: ListSubtitlesRequest): Promise<ListSubtitlesResponse> {
+        return await cached(this._listSubtitles.bind(this))(request);
+    }
+
+    private async _listSubtitles(request: ListSubtitlesRequest): Promise<ListSubtitlesResponse> {
         const queryParameters = new URLSearchParams({
             query: request.query,
         })
@@ -77,6 +100,24 @@ export class Client {
 
         const result = await response.json();
         return result as ListSubtitlesResponse;
+    }
+}
+
+type AsyncQuery<Request, Response> = (request: Request) => Promise<Response>
+
+function cached<Request, Response>(query: AsyncQuery<Request, Response>) {
+    return async function(request: Request): Promise<Response> {
+        const key = JSON.stringify(request);
+        const data = await chrome.storage.session.get(key);
+        const cachedResponse = data[key] as Response | undefined;
+        if (cachedResponse) {
+            return cachedResponse;
+        }
+        const response = await query(request);
+        let entry: Record<string, Response> = {};
+        entry[key] = response;
+        chrome.storage.session.set(entry);
+        return response
     }
 }
 

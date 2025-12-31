@@ -28,10 +28,6 @@ export class OpenSubtitlesComponent extends HTMLElement {
         `;
         window.addEventListener('user.authenticated', this.onUserAuthenticatedEvent.bind(this));
     }
-    
-    connectedCallback() {
-        console.log('connected!')
-    };
 
     private async onUserAuthenticatedEvent(event: CustomEvent<void>) {
         const response = await client.listSubtitles({ query: 'Pirates of the Caribean' })
@@ -105,7 +101,6 @@ class LoginComponent extends HTMLElement {
         const password = formData.get('password')?.valueOf() as string;
         // todo: improve error handling
         await client.login(username, password);
-        window.dispatchEvent(new CustomEvent('user.authenticated'))
     }
 }
 
