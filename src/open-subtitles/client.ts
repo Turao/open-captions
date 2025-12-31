@@ -33,6 +33,10 @@ export class Client {
         this.loadTokenFromStorage();
     }
 
+    get authenticated() {
+        return this.token !== undefined;
+    }
+
     private async loadTokenFromStorage() {
         const data = await chrome.storage.session.get('open-subtitles-token');
         const token = data['open-subtitles-token'] as string | undefined;
