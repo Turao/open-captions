@@ -38,7 +38,7 @@ export class Client {
     }
 
     private async loadTokenFromStorage() {
-        const data = await chrome.storage.session.get('open-subtitles-token');
+        const data = await chrome.storage.sync.get('open-subtitles-token');
         const token = data['open-subtitles-token'] as string | undefined;
         if (token) {
             this.token = token;
@@ -48,7 +48,7 @@ export class Client {
 
     private async setToken(token: string) {
         this.token = token;
-        await chrome.storage.session.set({ 'open-subtitles-token': token });
+        await chrome.storage.sync.set({ 'open-subtitles-token': token });
     }
 
     async login(username: string, password: string): Promise<void> {
