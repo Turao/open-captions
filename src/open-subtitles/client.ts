@@ -23,6 +23,11 @@ export type Subtitle = {
         language: string;
         download_count: number;
         url: string;
+        feature_details: {
+            feature_type: string;
+            title: string;
+            year: number;
+        }
     };
 }
 

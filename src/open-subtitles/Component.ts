@@ -4,9 +4,6 @@ declare global {
     interface WindowEventMap {
         'subtitles.updated': CustomEvent<Subtitles>,
         'content.updated': CustomEvent<string>,
-        'available_subtitles.updated': CustomEvent<Subtitles>,
-        'language.selected': CustomEvent<string>,
-        'subtitle.selected': CustomEvent<Subtitle>,
         'user.authenticated': CustomEvent<void>,
     }
 }
@@ -83,14 +80,12 @@ class ContentDetails extends HTMLElement {
 }
 
 class LoginComponent extends HTMLElement {
-    private formElement: HTMLFormElement;
+    private formElement?: HTMLFormElement;
 
     constructor() {
         super();
         this.attachShadow({mode: "open"});
         this.render();
-        this.formElement = this.shadowRoot!.getElementById('login-form') as HTMLFormElement;
-        this.formElement.addEventListener('submit', this.onSubmit.bind(this));
     }
 
     private async onSubmit(event: SubmitEvent) {
@@ -120,6 +115,9 @@ class LoginComponent extends HTMLElement {
                 </div>
             </form>
         `;
+
+        this.formElement = this.shadowRoot!.getElementById('login-form') as HTMLFormElement;
+        this.formElement.addEventListener('submit', this.onSubmit.bind(this));
     }
 }
 
@@ -132,6 +130,7 @@ class SubtitleSelector extends HTMLElement {
     // html elements
     private languageFormElement?: HTMLFormElement;
     private subtitleFormElement?: HTMLFormElement;
+    private downloadButton?: HTMLButtonElement;
 
     constructor() {
         super();
@@ -139,43 +138,35 @@ class SubtitleSelector extends HTMLElement {
         this.render();
 
         window.addEventListener('subtitles.updated', this.onSubtitlesUpdatedEvent.bind(this));
-        // re-render triggers
-
-        window.addEventListener('available_subtitles.updated', this.render.bind(this));
-        window.addEventListener('language.selected', this.render.bind(this));
-        window.addEventListener('subtitle.selected', this.render.bind(this));
     }
 
     private onSubtitlesUpdatedEvent(event: CustomEvent<Subtitles>) {
         this.availableSubtitles = event.detail;
+
         // reset selections
-        this.setSelectedLanguage();
-        this.setSelectedSubtitle();
+        this.selectedLanguage = this.languages.length > 0 ? this.languages[0] : undefined;
+        this.selectedSubtitle = this.selectedLanguage ? this.availableSubtitles[this.selectedLanguage][0] : undefined;
+
+        this.render();
     }
 
     private onLanguageFormElementChangeEvent(event: Event) {
         event.preventDefault();
         const formData = new FormData(this.languageFormElement);
         const language = formData.get('language')?.valueOf() as string;
-        this.setSelectedLanguage(language);
-    }
-
-    private setSelectedLanguage(language?: string) {
         this.selectedLanguage = language;
-        window.dispatchEvent(new CustomEvent('language.selected', { detail: language }));
+        this.selectedSubtitle = language ? this.availableSubtitles[language][0] : undefined;
+        this.render();
     }
 
     private onSubtitleFormElementChangeEvent(event: Event) {
-        console.log('event', event);
-        const serializedValue = (event.target as HTMLSelectElement).value
-        console.log('[subtitle-selector] subtitle selected', serializedValue);
-        const subtitle = JSON.parse(serializedValue) as Subtitle;
-        this.setSelectedSubtitle(subtitle);
-    }
+        const subtitleId = (event.target as HTMLSelectElement).value
+        const subtitle = Object.values(this.availableSubtitles)
+            .flatMap(s => s)
+            .find(subtitle => subtitle.id === subtitleId);
 
-    private setSelectedSubtitle(subtitle?: Subtitle) {
         this.selectedSubtitle = subtitle;
-        window.dispatchEvent(new CustomEvent('subtitle.selected', { detail: subtitle }));
+        this.render();
     }
 
     private get languages(): string[] {
@@ -188,18 +179,33 @@ class SubtitleSelector extends HTMLElement {
             Object.values(this.availableSubtitles).flatMap(s => s);
     }
 
+    private onDownloadButtonClickEvent(event: Event) {
+        event.preventDefault();
+        console.log('download button clicked', { subtitle: this.selectedSubtitle })
+    }
+
     private render() {
-        const languageOptions = this.languages.map((language, idx) => {
-            return `<option>${language}</option>`
+        const languageOptions = this.languages.map(language => {
+            const optionId = `language-option-${language}`
+            const selected = this.selectedLanguage === language ? 'selected' : '';
+            return `
+                <option ${selected} id="${optionId}" value="${language}">
+                    ${language}
+                </option>`
         })
 
-        const subtitleOptions = this.displayableSubtitles.map((subtitle, idx) => {
-            const serializedValue = JSON.stringify(subtitle);
-            return `<option value="${serializedValue}">${subtitle.attributes.url}</option>`
+        const subtitleOptions = this.displayableSubtitles.map(subtitle => {
+            const optionId = `subtitle-option-${subtitle.id}`
+            const selected = this.selectedSubtitle?.id === subtitle.id ? 'selected' : '';
+            return `
+                <option ${selected} id="${optionId}" value="${subtitle.id}">
+                    ${subtitle.id} - ${subtitle.attributes.feature_details.feature_type} - ${subtitle.attributes.feature_details.title}
+                </option>
+            `
         })
 
         const downloadButton = `
-            <button>Download</button>
+            <button id="download-button">Download</button>
         `
 
         this.shadowRoot!.innerHTML = `
@@ -227,155 +233,11 @@ class SubtitleSelector extends HTMLElement {
         // subtitle dropdown
         this.subtitleFormElement = this.shadowRoot!.getElementById('subtitle-form') as HTMLFormElement;
         this.subtitleFormElement.addEventListener('change', this.onSubtitleFormElementChangeEvent.bind(this));
-    }
-}
 
-class LanguageSelector extends HTMLElement {
-    private formElement: HTMLFormElement;
-    private selectElement: HTMLSelectElement;
-
-    constructor(parent: ShadowRoot) {
-        super();
-        this.attachShadow({ mode:"open" })
-        this.render();
-        this.formElement = this.shadowRoot!.getElementById('language-form') as HTMLFormElement;
-        this.selectElement = this.shadowRoot!.getElementById('language-select') as HTMLSelectElement;
-        this.formElement.addEventListener('change', this.onLanguageChangeEvent.bind(this));
-        window.addEventListener('subtitles.updated', this.onSubtitlesUpdatedEvent.bind(this));
-    }
-
-    private onLanguageChangeEvent(event: Event) {
-        event.preventDefault();
-        const formData = new FormData(this.formElement);
-        const language = formData.get('language')?.valueOf() as string;
-        console.log('[language-selector] language updated', {language});
-        window.dispatchEvent(new CustomEvent('language.selected', { detail: language }));
-    }
-
-    private onSubtitlesUpdatedEvent(event: CustomEvent<Subtitles>) {
-        const languages = Object.keys(event.detail).sort();
-        console.log('[language-selector] subtitles updated. updating languages', languages);
-        this.updateDataListElementOptions(languages);
-    }
-
-    private updateDataListElementOptions(languages: string[]) {
-        this.selectElement.innerHTML = '';
-        languages.forEach((language, idx) => {
-            if (idx === 0) {
-                window.dispatchEvent(new CustomEvent('language.selected', { detail: language }));
-            }
-            const option = document.createElement('option');
-            option.value = language;
-            option.label = language;
-            this.selectElement.appendChild(option)
-        })
-    }
-
-    private render() {
-        this.shadowRoot!.innerHTML = `
-            <form id="language-form">
-                <label for="language-select">Language</label>
-                <select id="language-select" name="language">
-                </select>
-            </form>
-        `;
-    }
-}
-
-class SubtitleSelectorLegacy extends HTMLElement {
-    private availableSubtitles: Subtitles = {};
-    private language?: string;
-    private selectElement: HTMLSelectElement;
-
-    constructor() {
-        super();
-        this.attachShadow({mode: "open"});
-        this.render();
-        this.selectElement = this.shadowRoot!.getElementById('subtitle-select') as HTMLSelectElement;
-        this.selectElement.addEventListener('change', this.onSelectElementChangeEvent.bind(this));
-        window.addEventListener('subtitles.updated', this.onSubtitlesUpdatedEvent.bind(this));
-        window.addEventListener('language.selected', this.onLanguageUpdatedEvent.bind(this));
-        window.addEventListener('subtitle.selected', this.onSubtitleSelectedEvent.bind(this));
-    }
-
-    get displayableSubtitles(): Subtitle[] {
-        return this.language ? 
-            this.availableSubtitles[this.language] :
-            Object.values(this.availableSubtitles).flatMap(s => s);
-    }
-
-    // todo: I need to find a way to send the Subtitle object to the SubtitleDownloader component via CustomEvent
-    // I'll probably have to use an identifier for the <option value="<identifier>">
-    // then, find the object in the availableSubtitles list
-    private onSelectElementChangeEvent(event: Event) {
-        const value = (event.target as HTMLSelectElement).value;
-        window.dispatchEvent(new CustomEvent('subtitle.selected', {detail: value}))
-    }
-
-    private onSubtitlesUpdatedEvent(event: CustomEvent<Subtitles>) {
-        this.availableSubtitles = event.detail;
-        console.log('[subtitle-selector] subtitles updated', this.availableSubtitles);
-        this.updateSubtitlesDatalist(this.displayableSubtitles);
-    }
-
-    private onLanguageUpdatedEvent(event: CustomEvent<string>) {
-        this.language = event.detail;
-        console.log('[subtitle-selector] language updated', this.language!);
-        this.updateSubtitlesDatalist(this.displayableSubtitles);
-    }
-
-    private updateSubtitlesDatalist(subtitles: Subtitle[]) {
-        this.selectElement.innerHTML = '';
-        subtitles.forEach(subtitle => {
-            const option = document.createElement('option');
-            option.value = subtitle.attributes.url;
-            option.innerText = `${subtitle.attributes.download_count}`;
-            this.selectElement.appendChild(option);
-        })
-    }
-
-    private onSubtitleSelectedEvent(event: CustomEvent<Subtitle>) {
-        console.log('[subtitle-selector] subtitle selected', event.detail);
-    }
-
-    private render() {
-        this.shadowRoot!.innerHTML = `
-            <form id="subtitle-form">
-            <label for="subtitle-select">Subtitle</label>
-                <select id="subtitle-select" name="subtitle">
-                </select>
-            </form>
-        `;
-    }
-}
-
-class SubtitleDownloader extends HTMLElement {
-    selectedSubtitle?: Subtitle;
-
-    constructor() {
-        super();
-        this.attachShadow({mode:'open'});
-        this.render();
-        window.addEventListener('subtitle.selected', this.onSubtitleSelectedEvent.bind(this));
-    }
-
-    private onSubtitleSelectedEvent(event: CustomEvent<Subtitle>) {
-        console.log('[subtitle-downloader] subtitle selected')
-        this.render();
-    }
-
-    private render() {
-        if (!this.selectedSubtitle) {
-            this.shadowRoot!.innerHTML = ``;
-            return
+        if (this.selectedSubtitle) {
+            this.downloadButton = this.shadowRoot!.getElementById('download-button') as HTMLButtonElement;
+            this.downloadButton.addEventListener('click', this.onDownloadButtonClickEvent.bind(this));
         }
-
-        this.shadowRoot!.innerHTML = `
-            <div>
-                <p>Download Count: ${this.selectedSubtitle!.attributes.download_count}</p>
-                <p>URL: ${this.selectedSubtitle!.attributes.url}</p>
-            </div>
-        `
     }
 }
 
@@ -384,8 +246,4 @@ export function init() {
     customElements.define('open-subtitles-login-component', LoginComponent);
     customElements.define('open-subtitles-content-details', ContentDetails);
     customElements.define('open-subtitles-subtitle-selector', SubtitleSelector);
-
-    // customElements.define('open-subtitles-language-selector', LanguageSelector);
-    // customElements.define('open-subtitles-subtitle-selector-legacy', SubtitleSelectorLegacy);
-    // customElements.define('open-subtitles-subtitle-downloader', SubtitleDownloader);
 }
